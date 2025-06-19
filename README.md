@@ -408,4 +408,157 @@ public function deactivateUser($id)
 | Button visibility per permission | Only allowed actions are shown |
 
 ---
+Here is a full section you can add to your `README.md` file to explain your implementation of **CSP**, **XSS**, and **CSRF** defenses for your Laravel To-Do App as required in your assignment:
 
+---
+
+## 🛡️ Web Security Enhancements: CSP, XSS, and CSRF
+
+This section explains how the Laravel To-Do App was secured by implementing **Content Security Policy (CSP)**, **Cross-Site Scripting (XSS)** prevention, and **Cross-Site Request Forgery (CSRF)** defenses.
+
+---
+
+### 🔐 1. Content Security Policy (CSP)
+
+**Goal**: Enforce same-origin policy and restrict which resources can be loaded by the browser.
+
+#### ✅ Implementation:
+
+1. Install the `spatie/laravel-csp` package:
+
+   ```bash
+   composer require spatie/laravel-csp
+   ```
+
+2. Publish the config file:
+
+   ```bash
+   php artisan vendor:publish --provider="Spatie\Csp\CspServiceProvider"
+   ```
+
+3. Customize the `config/csp.php`:
+
+   ```php
+   return [
+       'policy' => Spatie\Csp\Policies\Basic::class,
+   ];
+   ```
+
+4. Optionally, create a custom policy:
+
+   ```php
+   namespace App\Policies;
+
+   use Spatie\Csp\Policies\Policy;
+   use Spatie\Csp\Directive;
+   use Spatie\Csp\Keyword;
+
+   class CustomCspPolicy extends Policy
+   {
+       public function configure()
+       {
+           $this
+               ->addDirective(Directive::DEFAULT_SRC, [Keyword::SELF])
+               ->addDirective(Directive::SCRIPT_SRC, [Keyword::SELF])
+               ->addDirective(Directive::STYLE_SRC, [Keyword::SELF, 'https://fonts.bunny.net']);
+       }
+   }
+   ```
+
+   Update `config/csp.php`:
+
+   ```php
+   'policy' => App\Policies\CustomCspPolicy::class,
+   ```
+
+---
+
+### 🛑 2. XSS (Cross-Site Scripting) Defense
+
+**Goal**: Prevent user-submitted scripts from executing in the browser.
+
+#### ✅ Implementation:
+
+1. **Escape All Output in Blade Views:**
+
+   Laravel escapes all `{{ }}` by default. So always use:
+
+   ```blade
+   {{ $todo->title }}
+   {{ $user->nickname }}
+   ```
+
+2. **Validate and Sanitize Input:**
+
+   Example (in `FormRequest`):
+
+   ```php
+   public function rules()
+   {
+       return [
+           'title' => 'required|string|max:255',
+           'description' => 'nullable|string|max:1000'
+       ];
+   }
+   ```
+
+3. **Avoid `{!! !!}` unless necessary**, and sanitize it using Laravel Purifier (optional):
+
+   ```bash
+   composer require mews/purifier
+   ```
+
+---
+
+### 🛡️ 3. CSRF (Cross-Site Request Forgery) Protection
+
+**Goal**: Ensure forms are submitted only from trusted sources.
+
+#### ✅ Implementation:
+
+1. **Use Laravel’s built-in CSRF protection:**
+
+   Laravel includes a CSRF token in all forms:
+
+   ```blade
+   <form method="POST" action="{{ route('todo.store') }}">
+       @csrf
+       <!-- your inputs -->
+   </form>
+   ```
+
+2. **Ensure `VerifyCsrfToken` middleware is enabled:**
+
+   Located at:
+
+   ```php
+   App\Http\Middleware\VerifyCsrfToken::class
+   ```
+
+3. **AJAX requests must send CSRF token:**
+
+   ```js
+   $.ajaxSetup({
+       headers: {
+           'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+       }
+   });
+   ```
+
+4. **CSRF Token Meta Tag (already included):**
+
+   ```blade
+   <meta name="csrf-token" content="{{ csrf_token() }}">
+   ```
+
+---
+
+### ✅ Security Summary
+
+| Security Feature    | Implemented | Details                                                     |
+| ------------------- | ----------- | ----------------------------------------------------------- |
+| **CSP**             | ✅           | Set via Spatie Laravel CSP, custom policy added             |
+| **XSS Prevention**  | ✅           | Output escaping in Blade, input validation in Form Requests |
+| **CSRF Protection** | ✅           | Token used in all forms, middleware enabled                 |
+
+---
