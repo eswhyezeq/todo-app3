@@ -108,3 +108,104 @@ Additional filtering:
 * Each user can only access their own tasks using a `where('user_id', auth()->id())` condition in queries.
 
 ---
+
+# ✅ Laravel To-Do App: Security & Profile Enhancements
+
+This project enhances a basic Laravel To-Do App by implementing:
+
+- Input validation with Form Request classes
+- A user Profile Page with editable details and avatar upload
+- Multi-Factor Authentication (MFA) via email using Laravel Fortify
+- Custom password salting and secure hashing
+- Rate limiting on failed login attempts
+
+---
+
+## 🔒 1. Input Validation using Form Request
+
+- Created RegisterRequest and LoginRequest classes to validate user input.
+- Used regex to ensure only alphabets allowed for names and proper email format.
+- Applied confirmed, min:8 rules for password security.
+
+'name' => ['required', 'regex:/^[A-Za-z ]+$/'],
+'password' => ['required', 'min:8', 'confirmed'],
+
+## 👤 2. User Profile Page
+
+- Created a `ProfileController` to manage user profile.
+- Added fields to `users` table:
+  - `nickname`
+  - `avatar`
+  - `phone`
+  - `city`
+
+### User Features:
+- [ ] Upload a profile picture
+- [ ] Edit profile information:
+  - Nickname
+  - Email
+  - Phone
+  - City
+  - Password
+- [ ] Delete account
+
+> **Note:** Avatar uploads are stored in `/storage/app/public/avatars`
+
+## 🛡️ 3. Multi-Factor Authentication (MFA)
+
+### Implementation
+- Installed Laravel Fortify package:
+  ```bash
+  composer require laravel/fortify
+  php artisan vendor:publish --provider="Laravel\Fortify\FortifyServiceProvider"
+
+Features
+1. Email-based two-factor authentication (2FA)
+2. Users receive a verification code via email to complete login
+
+Flow
+1. User attempts login
+2. System sends verification code to registered email
+3. User enters code to complete authentication
+
+## 🔐 4. Password Hashing with Custom Salt
+
+### Database Changes
+- Added `salt` column to `users` table
+
+### Implementation Details
+- Generates random 16-character salt during registration
+- Combines password + salt before hashing
+- Stores both the hashed result and the plain salt
+- Modifies login process to use stored salt for verification
+
+### Code Example
+```php
+// Registration
+$salt = Str::random(16);
+$user->salt = $salt;
+$user->password = Hash::make($request->password . $salt);
+
+// Login Verification
+$user = User::where('email', $request->email)->first();
+if ($user && Hash::check($request->password . $user->salt, $user->password)) {
+    // Authentication passed
+};
+```
+---
+## 🚫 5. Rate Limiting for Login
+
+### Implementation
+- Added rate limiting to prevent brute-force attacks
+- Configured in `RouteServiceProvider.php`
+- Limits to **3 login attempts per minute**
+
+### Configuration
+```php
+// In RouteServiceProvider.php
+RateLimiter::for('login', function (Request $request) {
+    return Limit::perMinute(3)->by($request->email . $request->ip());
+});
+```
+
+---
