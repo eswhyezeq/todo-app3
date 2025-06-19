@@ -207,5 +207,205 @@ RateLimiter::for('login', function (Request $request) {
     return Limit::perMinute(3)->by($request->email . $request->ip());
 });
 ```
+---
+Here’s your **GitHub `README.md` update** explaining the **Authorization and Role-Based Access Control (RBAC)** implementation for your Laravel To-Do App:
 
 ---
+
+## 🛡️ Authorization & Role-Based Access Control (RBAC)
+
+This section documents the implementation of **Authorization Layer with RBAC** in the Laravel-based To-Do App.
+
+---
+
+### ✅ Purpose
+
+To restrict access to different parts of the application based on **user roles** (User/Admin) and their **permissions** (CRUD rights).
+
+---
+
+### 👥 User Roles
+
+We implemented two primary user roles:
+
+| Role  | Access                                            |
+| ----- | ------------------------------------------------- |
+| Admin | Full access to all users, To-Dos, role management |
+| User  | Can only perform actions permitted by their role  |
+
+---
+
+### 🧱 Database Schema Changes
+
+#### 1. `user_roles` Table
+
+Stores roles assigned to each user.
+
+| Column      | Type                           |
+| ----------- | ------------------------------ |
+| id          | bigint                         |
+| user\_id    | foreign key to `users.id`      |
+| role\_name  | string (e.g., `admin`, `user`) |
+| description | string                         |
+
+#### 2. `role_permissions` Table
+
+Stores actions each role is allowed to perform.
+
+| Column         | Type                                              |
+| -------------- | ------------------------------------------------- |
+| id             | bigint                                            |
+| user\_role\_id | foreign key to `user_roles.id`                    |
+| permission     | string (`Create`, `Retrieve`, `Update`, `Delete`) |
+
+---
+
+### 🛠️ Models
+
+#### `User.php`
+
+```php
+public function role()
+{
+    return $this->hasOne(UserRole::class);
+}
+```
+
+#### `UserRole.php`
+
+```php
+public function user()
+{
+    return $this->belongsTo(User::class);
+}
+
+public function permissions()
+{
+    return $this->hasMany(RolePermission::class);
+}
+```
+
+#### `RolePermission.php`
+
+```php
+public function userRole()
+{
+    return $this->belongsTo(UserRole::class);
+}
+```
+
+---
+
+### 🧪 Seeding Roles and Permissions
+
+#### `UserRolesSeeder.php`
+
+```php
+UserRole::create([
+    'user_id' => 1,
+    'role_name' => 'admin',
+    'description' => 'Administrator'
+]);
+
+UserRole::create([
+    'user_id' => 2,
+    'role_name' => 'user',
+    'description' => 'Regular user'
+]);
+```
+
+Run with:
+
+```bash
+php artisan db:seed --class=UserRolesSeeder
+```
+
+---
+
+### 🔐 Middleware for Role Authorization
+
+#### `RoleMiddleware.php`
+
+```php
+public function handle($request, Closure $next, $role)
+{
+    if (Auth::check() && Auth::user()->role->role_name === $role) {
+        return $next($request);
+    }
+
+    abort(403, 'Unauthorized');
+}
+```
+
+Registered in `Kernel.php`:
+
+```php
+'role' => \App\Http\Middleware\RoleMiddleware::class,
+```
+
+---
+
+### 🌐 Route Definitions
+
+```php
+// User Routes
+Route::middleware(['auth', 'role:user'])->group(function () {
+    Route::resource('todo', TodoController::class);
+});
+
+// Admin Routes
+Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('/admin/users', [AdminController::class, 'listUsers'])->name('admin.users');
+    Route::post('/admin/user/{id}/deactivate', [AdminController::class, 'deactivateUser'])->name('admin.deactivate');
+});
+```
+
+---
+
+### 🖥️ Admin Functions
+
+#### AdminController:
+
+```php
+public function listUsers()
+{
+    $users = User::with('role')->get();
+    return view('admin.users', compact('users'));
+}
+
+public function deactivateUser($id)
+{
+    $user = User::findOrFail($id);
+    $user->delete();
+    return back()->with('success', 'User deactivated.');
+}
+```
+
+---
+
+### 🧼 Blade UI Authorization Example
+
+```blade
+@php
+    $permissions = Auth::user()->role->permissions->pluck('permission')->toArray();
+@endphp
+
+@if(in_array('Create', $permissions))
+    <a href="{{ route('todo.create') }}" class="btn btn-primary">New Task</a>
+@endif
+```
+
+---
+
+### ✅ Test Cases
+
+| Scenario                         | Outcome                        |
+| -------------------------------- | ------------------------------ |
+| User logs in                     | Redirected to `/todo`          |
+| Admin logs in                    | Redirected to `/admin/users`   |
+| User accesses admin route        | Blocked with 403               |
+| Admin deactivates user           | User account deleted           |
+| Button visibility per permission | Only allowed actions are shown |
+
+---
+
